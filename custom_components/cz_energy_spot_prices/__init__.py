@@ -241,14 +241,14 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry):
                 except LookupError:
                     pass
 
-        if ENTRY_COORDINATOR in domain_data:
-            domain_data.pop(ENTRY_COORDINATOR, None)
+            if ENTRY_COORDINATOR in domain_data:
+                domain_data.pop(ENTRY_COORDINATOR, None)
 
-        if GLOBAL_ELECTRICITY_SENSOR_FLAG in domain_data:
-            domain_data.pop(GLOBAL_ELECTRICITY_SENSOR_FLAG, None)
+            if GLOBAL_ELECTRICITY_SENSOR_FLAG in domain_data:
+                domain_data.pop(GLOBAL_ELECTRICITY_SENSOR_FLAG, None)
 
-        if GLOBAL_GAS_SENSOR_FLAG in domain_data:
-            domain_data.pop(GLOBAL_GAS_SENSOR_FLAG, None)
+            if GLOBAL_GAS_SENSOR_FLAG in domain_data:
+                domain_data.pop(GLOBAL_GAS_SENSOR_FLAG, None)
 
     return unload_ok
 
