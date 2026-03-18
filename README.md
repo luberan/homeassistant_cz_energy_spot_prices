@@ -9,6 +9,7 @@ If this integration saves (or earns) you some money, you can [buy me a coffee �
 ## Features
 
 - Provides real-time Czech electricity spot and gas prices from [OTE](https://ote-cr.cz).
+- Supports **hourly (60-minute)** and **15-minute (quarter-hour)** price intervals for electricity.
 - Supports multiple currencies (EUR, CZK) and energy units (kWh, MWh).
 - Configurable templates for buy/sell prices, including VAT and distribution fees.
 - Includes sensors for monitoring current, cheapest, and most expensive electricity prices.
@@ -22,6 +23,19 @@ OTE (Czech market operator) uses hourly prices indexed from `1`, where:
 - It does **not** mean `01:00 - 02:00`, as one might expect.
 
 Keep this in mind when comparing prices reported by this integration with other sources (e.g., OTE, your electricity provider/distributor).
+
+### Hourly vs 15-minute intervals
+
+During setup you can choose between **60-minute (hourly)** and **15-minute (quarter-hour)** intervals for electricity. The OTE API always provides 15-minute granularity — when you select hourly mode, the integration uses the pre-aggregated hourly price from OTE.
+
+With 15-minute intervals:
+- The current price sensor updates every 15 minutes (at :00, :15, :30, :45).
+- Cheapest/most expensive sensors show the cheapest/most expensive 15-minute interval.
+- Cheapest block binary sensors (e.g. "cheapest 2 hours block") find the cheapest consecutive block of the given number of hours (2 hours = 8 × 15-minute intervals).
+- A dedicated single-interval cheapest sensor (`is_cheapest_15min`) shows the cheapest single 15-minute interval.
+- Attributes `Start hour` / `End hour` / `hour` are **not** included for 15-minute sensors (only `Start` / `End` / `at` timestamps are provided).
+
+You can add both hourly and 15-minute entries at the same time — they share the same data source and work independently.
 
 ## Screenshot
 
@@ -93,6 +107,8 @@ You can install the integration using HACS (preferred) or manually.
 The integration provides several sensors to monitor electricity/gas prices and related data. Below is a list of available sensors and their attributes:
 
 
+### Hourly sensors (60-minute interval)
+
 | Sensor | value | attributes |
 | ------ | ----- | ---------- |
 | **Current Spot Electricity Price** | electricity price for current hour | dictionary with timestamps as keys and spot price for given hour as values |
@@ -106,6 +122,24 @@ The integration provides several sensors to monitor electricity/gas prices and r
 | **Spot Electricity Is Cheapest** | `On` when current hour has the cheapest price, `Off` otherwise | [Start](#start)<br>[Start hour](#start-hour)<br>[End](#end)<br>[End hour](#end-hour)<br>[Min](#min)<br>[Max](#max)<br>[Mean](#mean) |
 | **Spot Electricity Is Cheapest `X` Hours Block** | `On` when current hour is in a block of cheapest consecutive hours, `Off` otherwise | [Start](#start)<br>[Start hour](#start-hour)<br>[End](#end)<br>[End hour](#end-hour)<br>[Min](#min)<br>[Max](#max)<br>[Mean](#mean) |
 
+### 15-minute sensors (quarter-hour interval)
+
+When configured with 15-minute interval, sensors have `_15min` suffix in their entity ID and provide quarter-hour granularity (96 intervals per day instead of 24).
+
+| Sensor | value | attributes |
+| ------ | ----- | ---------- |
+| **Current 15min Spot Electricity Price** | electricity price for current 15-minute interval | dictionary with timestamps as keys and spot price for given 15-minute interval as values |
+| **Spot Cheapest Electricity Today 15min** | price of the cheapest 15-minute interval today | [At](#at) |
+| **Spot Most Expensive Electricity Today 15min** | price of the most expensive 15-minute interval today | [At](#at) |
+| **Spot Cheapest Electricity Tomorrow 15min** | price of the cheapest 15-minute interval tomorrow | [At](#at) |
+| **Spot Most Expensive Electricity Tomorrow 15min** | price of the most expensive 15-minute interval tomorrow | [At](#at) |
+| **Current 15min Spot Electricity Order** | order of current 15-minute interval (1=cheapest, 96=most expensive) | dictionary with timestamps as keys and `order, price` as values |
+| **Tomorrow 15min Spot Electricity Order** | no value | dictionary with timestamps as keys and `order, price` as values |
+| **15min Spot Electricity Is Cheapest** | `On` when current 15-minute interval has the cheapest price, `Off` otherwise | [Start](#start)<br>[End](#end)<br>[Min](#min)<br>[Max](#max)<br>[Mean](#mean) |
+| **15min Spot Electricity Is Cheapest `X` Hours Block** | `On` when current time is in a block of cheapest consecutive X hours (X×4 intervals), `Off` otherwise | [Start](#start)<br>[End](#end)<br>[Min](#min)<br>[Max](#max)<br>[Mean](#mean) |
+
+> **Note:** 15-minute sensors do not include the `Hour`, `Start hour`, or `End hour` attributes. Use the `At`, `Start`, and `End` timestamp attributes instead.
+
 If you configure templates for buy and sell prices, there will also be similar sensors for buy/sell prices.
 
 <!-- FIXME: add gas sensors when released -->
@@ -118,7 +152,7 @@ timestamp when the cheapest hour starts
 
 ### Hour
 
-hour with the cheapest electricity (`2` means that cheapest electricity is from `2:00` till `3:00` in timezone you've configured in Home Assistant)
+hour with the cheapest electricity (`2` means that cheapest electricity is from `2:00` till `3:00` in timezone you've configured in Home Assistant). Only available for hourly (60-minute) sensors.
 
 ### Start
 
