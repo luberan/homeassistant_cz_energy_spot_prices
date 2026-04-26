@@ -57,15 +57,15 @@ Variables:
 
 ```jinja
 {% set tax_kWh = 28.30 / 1000.0 %}
-{% set system_services_kWh = 212.82 / 1000.0 %}
-{% set oze_kWh = 495 / 1000.0 %}
-{% set low_distrib_kWh = 450.43 / 1000.0 %}
-{% set high_distrib_kWh = 644.30 / 1000.0 %}
-{% set operator_cost_kWh = 350.0 / 1000.0 %}
+{% set system_services_kWh = 164.24 / 1000.0 %}
+{% set oze_kWh = 0 / 1000.0 %}
+{% set low_distrib_kWh = 116.5 / 1000.0 %}
+{% set high_distrib_kWh = 754.77 / 1000.0 %}
+{% set operator_cost_kWh = 250.0 / 1000.0 %}
 {% set vat_percent = 21 %}
 
 {% set distrib_kWh = low_distrib_kWh %}
-{% if as_local(hour).hour in [9, 12, 16, 20] %}
+{% if as_local(hour).hour in [8, 12, 15, 19] %}
   {% set distrib_kWh = high_distrib_kWh %}
 {% endif %}
 
