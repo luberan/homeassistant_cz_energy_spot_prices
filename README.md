@@ -195,22 +195,36 @@ header:
   show: true
   show_states: true
   colorize_states: true
-graph_span: 2d
+  title: Nákupní cena (15 min)
+graph_span: 1d
 span:
   start: day
 now:
   show: true
-  label: Now
+  label: Nyní
+  color: "#ff0000"
 series:
-  - entity: sensor.current_spot_electricity_price
+  - entity: sensor.current_buy_electricity_price_15min
+    name: Cena
     float_precision: 2
-    type: column # or "line" if you prefer
+    type: line
+    curve: stepline
+    stroke_width: 2
     show:
       in_header: raw
+    color_threshold:
+      - value: -10
+        color: "#00cc00"
+      - value: 0
+        color: "#ffaa00"
+      - value: 4
+        color: "#ff0000"
     data_generator: |
-      return Object.entries(entity.attributes).map(([date, value], index) => {
-        return [new Date(date).getTime() + (30 * 60 * 1000), value];
-      });
+      return Object.entries(entity.attributes)
+        .filter(([key, _]) => !isNaN(Date.parse(key)))
+        .map(([date, value]) => {
+          return [new Date(date).getTime(), value];
+        });
 ```
 
 ## Find cheapest hours in selected interval
