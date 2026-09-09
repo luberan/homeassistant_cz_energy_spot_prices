@@ -207,7 +207,7 @@ Each search is shown as a separate entry beneath its electricity configuration. 
 - `Min`, `Max`, and `Mean` price in the block
 - `Length hours`, `Price type`, `Objective`, and `Search type`
 
-Fixed time-window searches are evaluated only when prices cover the complete configured window. Until an upcoming cross-midnight window is fully published, the sensor retains the latest fully evaluated occurrence and remains `Off` once that occurrence has ended.
+Fixed time-window searches are evaluated only when prices cover the complete configured window without gaps. An internal gap in an upcoming window also triggers fallback to the latest complete occurrence. Until an upcoming cross-midnight window is fully published, the sensor retains the latest fully evaluated occurrence and remains `Off` once that occurrence has ended.
 
 For 60-minute electricity instances, the sensor also exposes `Start hour` and `End hour`. For 15-minute instances, the start and end timestamps are more precise than whole hours, so use `Start` and `End`.
 

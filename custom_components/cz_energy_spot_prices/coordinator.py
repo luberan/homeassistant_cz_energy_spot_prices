@@ -23,7 +23,12 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.util.dt import now
 
-from .cheapest_blocks import PriceBlockSearch, find_price_block, resolve_search_window
+from .cheapest_blocks import (
+    PriceBlockSearch,
+    find_price_block,
+    has_complete_price_coverage,
+    resolve_search_window,
+)
 from .cnb_rate import CnbRate
 from .const import (
     Commodity,
@@ -374,12 +379,20 @@ class IntervalSpotRateData:
             available_end = sorted_intervals[-1][0] + timedelta(
                 seconds=interval_seconds
             )
+        interval_starts = [dt for dt, _interval in sorted_intervals]
+
+        def window_is_complete(start: datetime, end: datetime) -> bool:
+            return has_complete_price_coverage(
+                interval_starts, start, end, interval_seconds
+            )
+
         for search in config.cheapest_block_searches:
             window_bounds = resolve_search_window(
                 search,
                 self.now,
                 available_end,
                 available_start,
+                window_is_complete=window_is_complete,
             )
             if window_bounds is None:
                 _LOGGER.debug("Search %s: could not resolve window", search.id)

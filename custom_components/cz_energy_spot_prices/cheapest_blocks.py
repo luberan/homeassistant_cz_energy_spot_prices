@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, time, timedelta
+from collections.abc import Callable
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any, Final
 from zoneinfo import ZoneInfo
@@ -292,8 +293,14 @@ def resolve_search_window(
     now_local: datetime,
     available_end: datetime | None,
     available_start: datetime | None = None,
+    *,
+    window_is_complete: Callable[[datetime, datetime], bool] | None = None,
 ) -> tuple[datetime, datetime] | None:
-    """Convert a search definition into an absolute start/end window."""
+    """Resolve bounds, optionally checking coverage of fixed occurrences.
+
+    The coverage callback receives local boundaries and lets the fixed-window
+    lookback skip internal gaps as well as unpublished date ranges.
+    """
     search_type = search.type
     zoneinfo = now_local.tzinfo
     if zoneinfo is None:
@@ -334,7 +341,10 @@ def resolve_search_window(
                 if (available_start is None or candidate_start >= available_start) and (
                     available_end is None or candidate_end <= available_end
                 ):
-                    return candidate_start, candidate_end
+                    if window_is_complete is None or window_is_complete(
+                        candidate_start, candidate_end
+                    ):
+                        return candidate_start, candidate_end
             return None
 
     else:
@@ -349,6 +359,32 @@ def resolve_search_window(
         return None
 
     return start, end
+
+
+def has_complete_price_coverage(
+    interval_starts: list[datetime],
+    window_start: datetime,
+    window_end: datetime,
+    interval_seconds: int,
+) -> bool:
+    """Check sorted UTC intervals cover a window without any internal gaps."""
+    # Recurring boundaries are local; coverage uses elapsed time across DST.
+    window_start = window_start.astimezone(UTC)
+    window_end = window_end.astimezone(UTC)
+    interval_delta = timedelta(seconds=interval_seconds)
+    covering = [
+        dt
+        for dt in interval_starts
+        if dt < window_end and dt + interval_delta > window_start
+    ]
+    return bool(covering) and (
+        covering[0] <= window_start
+        and covering[-1] + interval_delta >= window_end
+        and all(
+            following - previous == interval_delta
+            for previous, following in zip(covering, covering[1:])
+        )
+    )
 
 
 def find_price_block(
@@ -375,22 +411,10 @@ def find_price_block(
         return None
 
     interval_delta = timedelta(seconds=interval_seconds)
-    if require_complete_window:
-        covering = [
-            dt
-            for dt, _price in intervals
-            if dt < window_end and dt + interval_delta > window_start
-        ]
-        if (
-            not covering
-            or covering[0] > window_start
-            or covering[-1] + interval_delta < window_end
-            or any(
-                following - previous != interval_delta
-                for previous, following in zip(covering, covering[1:])
-            )
-        ):
-            return None
+    if require_complete_window and not has_complete_price_coverage(
+        [dt for dt, _price in intervals], window_start, window_end, interval_seconds
+    ):
+        return None
 
     try:
         required = compute_required_intervals(length_hours, interval_seconds)

@@ -5,6 +5,7 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import cast
 from unittest.mock import AsyncMock, patch
+from zoneinfo import ZoneInfo
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -106,6 +107,73 @@ def test_fixed_overnight_search_uses_previous_complete_window_until_publish(
     window = data.search_windows["overnight"]
     assert window.start.astimezone(PRAGUE_TZ).date() == today.date() - timedelta(days=1)
     assert window.end <= today.astimezone(UTC) + timedelta(hours=6)
+
+
+@pytest.mark.parametrize("interval_seconds", [900, 3600])
+@pytest.mark.parametrize("objective", list(SearchObjective))
+@pytest.mark.parametrize("zone", ["Europe/Prague", "America/New_York"])
+@pytest.mark.parametrize("date", [(2025, 10, 22), (2026, 3, 29), (2025, 10, 26)])
+def test_fixed_window_gap_falls_back_to_latest_complete_occurrence(
+    interval_seconds: int,
+    objective: SearchObjective,
+    zone: str,
+    date: tuple[int, int, int],
+) -> None:
+    """Internal gaps must preserve the previous result until coverage recovers."""
+    tz = ZoneInfo(zone)
+    today = datetime(*date, tzinfo=tz)
+    start_utc = (today - timedelta(days=1)).astimezone(UTC)
+    end_utc = (today + timedelta(days=2)).astimezone(UTC)
+    step = timedelta(seconds=interval_seconds)
+    rates = {
+        start_utc + index * step: Decimal(1)
+        for index in range(int((end_utc - start_utc) / step))
+    }
+    config = EntryConfig(
+        commodity=Commodity.Electricity,
+        interval=(
+            SpotRateIntervalType.Hour if interval_seconds == 3600
+            else SpotRateIntervalType.QuarterHour
+        ),
+        currency=Currency.EUR,
+        currency_human="EUR",
+        unit=EnergyUnit.MWh,
+        timezone=zone,
+        zoneinfo=tz,
+        buy_template=None,
+        sell_template=None,
+        cheapest_block_searches=[
+            PriceBlockSearch(
+                id="overnight",
+                name="Overnight",
+                type=SearchType.FIXED,
+                length_hours=3,
+                start_time=time(20),
+                end_time=time(6),
+                objective=objective,
+            )
+        ],
+    )
+    missing_utc = (today + timedelta(hours=23)).astimezone(UTC)
+    del rates[missing_utc]
+    with freeze_time(today + timedelta(hours=14)):
+        data = IntervalSpotRateData(config, rates, rate_template=None)
+        window = data.search_windows["overnight"]
+        assert window.start == (
+            today - timedelta(days=1) + timedelta(hours=20)
+        ).astimezone(UTC)
+        assert window.end - window.start == timedelta(hours=3)
+
+        rates[missing_utc] = Decimal(1)
+        restored = IntervalSpotRateData(config, rates, rate_template=None)
+        assert restored.search_windows["overnight"].start == (
+            today + timedelta(hours=20)
+        ).astimezone(UTC)
+
+        del rates[missing_utc]
+        del rates[(today - timedelta(days=1) + timedelta(hours=23)).astimezone(UTC)]
+        incomplete = IntervalSpotRateData(config, rates, rate_template=None)
+        assert "overnight" not in incomplete.search_windows
 
 
 def test_fixed_overnight_search_switches_to_next_window_after_publish():
